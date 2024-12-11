@@ -1,0 +1,341 @@
+---
+title: "NFL Player Analysis"
+date: last-modified
+date-format: "[Last modified on] MMMM DD, YYYY HH:mm:ss zzz"
+format: 
+  html:
+    theme: cosmo  # zephyr pulse, sketchy, default, cosmo, vapor etc
+author:
+  - name: Thomas Hudson
+    email: hudsontm@appstate.edu
+    affiliation:
+      - name: Appalachian State University
+        city: Boone
+        state: NC  
+        url: https://www.appstate.edu/
+keywords:
+  - R
+  - data viz
+license: "CC BY"  
+code-fold: false
+---
+
+
+# Introduction
+This is an exploration to the statistics from the 2023 NFL season. This data analysis hopes to explore different facets of the statistics provided to find common trends.
+
+## Loading Neccesary Packages
+
+```{r}
+#| label: "needed"
+# For data manipulation and tidying
+library(dplyr)
+library(lubridate)
+library(tidyr)
+
+#to unpack .parq files
+library(arrow)
+
+# For data visualizations
+library(ggplot2)
+```
+
+## Importing the Data
+
+All of the data can be downloaded from [Kaggle](https://www.kaggle.com/datasets/jpmiller/nfl-competition-data/data). This project contains 3 data sets, the .parq files utilize the arrow package to pull the massive files into .csv files, and each file is imported and inspected independently using the `read.csv()` function.
+
+```{r}
+#creating a .csv file for the players dataset
+#this was run one time to pull the data into my folder, then reorganized
+#players <- read_parquet("./competition_data/players.parq")
+#write.csv(players, "players.csv", row.names = FALSE)
+players <- read.csv(file = "./data/players.csv",
+                    header = TRUE,
+                    stringsAsFactors = FALSE)
+#games <- read_parquet("./competition_data/games.parq")
+#write.csv(games, "games.csv", row.names = FALSE)
+games <- read.csv(file = "./data/games.csv",
+                    header = TRUE,
+                    stringsAsFactors = FALSE)
+
+#plays <- read_parquet("./competition_data/plays.parq")
+#write.csv(plays, "plays.csv", row.names = FALSE)
+plays <- read.csv(file = "./data/plays.csv",
+                    header = TRUE,
+                    stringsAsFactors = FALSE)
+```
+
+The .parq files will not be included in the github for this project due to the size of the files being too large.
+
+### Data Structures and Variables
+
+#### `players`
+
+```{r}
+#| echo: false
+glimpse(players)
+```
+
+There are 7 variables in the data `players` data frame:
+
+1. `nflId`: Unique identifier for the player.
+
+2. `height`: Height of the player in feet.
+
+3. `weight`: Weight of the player in pounds.
+
+4. `birthDate`: Player's date of birth (some missing values).
+
+5. `collegeName`: The college the player attended.
+
+6. `position`: The player's position in the team (e.g., QB, T, TE).
+
+7. `displayName`: The player's name.
+
+#### `games`
+
+```{r}
+glimpse(games)
+```
+
+There are 8 variables in the `games` data set
+
+1. `gameId`: A unique identifier for each game.
+
+2. `season`: The year of the season during which the game was played.
+
+3. `week`: The week number of the NFL season.
+
+4. `homeTeamAbbr`: The abbreviation of the home team's name.
+
+5. `visitorTeamAbbr`: The abbreviation of the visiting team's name.
+
+6. `homeFinalScore`: The final score of the home team.
+
+7. `visitorFinalScore`: The final score of the visiting team.
+
+8. `gameDatetime`: The date and time when the game occurred.
+
+#### `plays`
+
+```{r}
+glimpse(plays)
+```
+
+There are 35 variables in the `games` data set
+
+1. `gameId`: Unique identifier for the game.
+
+2. `playId`: Unique identifier for the play within the game.
+
+3. `ballCarrierId`: NFL ID of the ball carrier during the play (if applicable).
+
+4. `ballCarrierDisplayName`: Name of the ball carrier during the play (if applicable).
+
+5. `playDescription`: Textual description of the play, including actions and results.
+
+6. `quarter`: The quarter of the game when the play occurred.
+
+7. `down`: The down number during the play (e.g., 1st, 2nd).
+
+8. `yardsToGo`: The number of yards needed for a first down at the start of the play.
+
+9. `possessionTeam`: The team that possessed the ball during the play.
+
+10. `defensiveTeam`: The team defending during the play.
+
+11. `yardlineSide`: The side of the field where the play started, based on the team.
+
+12. `yardlineNumber`: The specific yard line where the play started.
+
+13. `gameClock`: The time remaining in the game during the play (in MM:SS).
+
+14. `preSnapHomeScore`: The home team's score before the play began.
+
+15. `preSnapVisitorScore`: The visiting team's score before the play began.
+
+16. `passResult`: Outcome of the pass play (if applicable, e.g., completed, intercepted).
+
+17. `passLength`: Distance of the pass in yards (if applicable).
+
+18. `penaltyYards`: The number of yards gained or lost due to penalties (if applicable).
+
+19. `prePenaltyPlayResult`: Outcome of the play before accounting for penalties (in yards).
+
+20. `playResult`: Final outcome of the play, including penalty effects (in yards).
+
+21. `playNullifiedByPenalty`: Indicator of whether the play was nullified due to a penalty.
+
+22. `absoluteYardlineNumber`: Standardized yard line on the field where the play began.
+
+23. `offenseFormation`: The offensive team's formation during the play (e.g., shotgun).
+
+24. `defendersInTheBox`: The number of defensive players positioned near the line of scrimmage.
+
+25. `passProbability`: Probability of a pass play based on pre-play context.
+
+26. `preSnapHomeTeamWinProbability`: The home team's likelihood of winning before the play.
+
+27. `preSnapVisitorTeamWinProbability`: The visiting team's likelihood of winning before the play.
+
+28. `homeTeamWinProbabilityAdded`: Change in the home team's win probability due to the play.
+
+29. `visitorTeamWinProbabilityAdded`: Change in the visiting team's win probability due to the play.
+
+30. `expectedPoints`: The expected points based on field position before the play.
+
+31. `expectedPointsAdded`: Change in expected points due to the play.
+
+32. `foulName1`: Name of the first foul committed during the play (if applicable).
+
+33. `foulName2`: Name of the second foul committed during the play (if applicable).
+
+34. `foulNFLId1`: NFL ID of the player who committed the first foul (if applicable).
+
+35. `foulNFLId2`: NFL ID of the player who committed the second foul (if applicable).
+
+# Data Visualization
+
+## Exploring the `games` Dataset
+
+### Home Team Advantage?
+
+First thing I as hoping to analyze was whether the home team truely had an advantage.
+
+```{r}
+#| label: fig-graph1
+#| fig.cap: line graph that compares the average scores of home and visiting teams across weeks or seasons.
+#| echo: false
+library(ggplot2)
+library(dplyr)
+
+# Aggregate average scores by week
+weekly_scores <- games %>%
+  group_by(week) %>%
+  summarize(avg_home_score = mean(homeFinalScore),
+            avg_visitor_score = mean(visitorFinalScore))
+
+# Line plot for trends
+ggplot(weekly_scores, aes(x = week)) +
+  geom_line(aes(y = avg_home_score, color = "Home Score"), linewidth = 1) +
+  geom_line(aes(y = avg_visitor_score, color = "Visitor Score"), linewidth = 1) +
+  labs(title = "Weekly Average Scores: Home vs Visitor",
+       x = "Week", y = "Average Score") +
+  scale_color_manual(name = "Team", values = c("Home Score" = "blue", "Visitor Score" = "red")) +
+  theme_minimal()
+```
+
+Generally, the home team scored more points than the visiting team.
+
+### Close games vs. Blow outs
+
+I also want to figure out what is a "normal margin of vistory in a game. Do teams normally win by a lot of points, or is there some score that is more common than others.
+
+```{r}
+#| label: fig-graph2
+#| fig.cap: Histogram that analyzes the distribution of score differences
+#| echo: false
+game_data <- games %>%
+  mutate(score_diff = abs(homeFinalScore - visitorFinalScore))
+
+ggplot(game_data, aes(x = score_diff)) +
+  geom_histogram(binwidth = 1, fill = "skyblue", color = "black", alpha = 0.7) +
+  labs(title = "Distribution of Score Differences", x = "Score Difference", y = "Frequency") +
+  scale_x_continuous(breaks = seq(0, 36, by = 3)) +
+  theme_minimal()
+```
+
+By far, the most common margin of victory/defeat is 3 points, which is equivaalent to 1 field goal. It also appears that after about 10 points, the margins occur just about as often as each other, all 5 or less times, with a few outlier differences past 24.
+
+## Exploring the `plays` data set
+
+### Play Outcome by Formation
+
+I want to figure out which formations lead to the most positive results
+
+```{r}
+#| label: fig-graph3
+#| fig.cap: Bar graph analyzing yards per play by formation
+#| echo: false
+formation_data <- plays %>%
+  group_by(offenseFormation) %>%
+  summarize(avg_yards = mean(playResult, na.rm = TRUE))
+
+# Bar chart for formations
+ggplot(formation_data, aes(x = reorder(offenseFormation, avg_yards), y = avg_yards)) +
+  geom_bar(stat = "identity", fill = "steelblue") +
+  coord_flip() +
+  labs(title = "Average Yards Gained by Offensive Formation",
+       x = "Offensive Formation", y = "Average Yards") +
+  theme_minimal()
+```
+
+It seems that the formations that utilize 0 or 1 runningbacks (empty, shotgun, singleback) end up averaging more yards than formations with 2 or more running backs. This can be very circumsatntial, as those plays may be run in "passing obvious" situations where the defending team is simply trying to prevent a big play, where as heavier formations will be used in short yardage situations to guarentee positive gains without the inherent risk of an incomplete or intercepted pass.
+
+### Defenders in the box vs. position on the field
+
+"The box" on defense refers to the area on the field between the edge of the down linemen, withing about 5-7 yards of the line of scrimmage. This often is to ensure a strong run defense at the cost of bigger, less mobile players having to be in pass coverage. This chart looks to figure out if there is a corelation between position on the field and how many defenders are in the box.
+
+```{r}
+#| label: fig-graph4
+#| fig.cap: hexagonal point graph for yardline number against defenders in the box.
+#| echo: false
+ggplot(plays, aes(x = defendersInTheBox, y = yardlineNumber)) +
+  geom_hex(bins = 30, fill = "blue", color = "white") + #using hx because point was too cluttered
+  geom_smooth(method = "lm", color = "red", se = FALSE) +
+  labs(title = "Defenders in the Box vs. Yardline Number (Hexbin)",
+       x = "Defenders in the Box",
+       y = "Yardline Number") +
+  theme_minimal() +
+  scale_fill_viridis_c()
+```
+
+This graph shows us that generally, teams mostly use between 5 players in the box (most often referred to as "dime package") and 8 players in the box (which is just 8-in-the box). There seems to be a slightly negative trend in yard line number and defenders in the box, meaning that there is some correlation between the start of the play on th field, and defenders in the box.
+
+## Combined Analysis
+
+### Player Attributes and Play Success
+
+This graph aims to analyze what is th "ideal" player weight in terms of yards gained per carry.
+
+```{r}
+#| label: fig-graph5
+#| fig.cap: scatter plot with the weight of every player who has carried the ball, and how many yars were gained on that attempt
+#| echo: false
+combined_data <- plays %>%
+  left_join(players, by = c("ballCarrierId" = "nflId"))
+
+# Scatter plot for yards gained vs. player weight
+ggplot(combined_data, aes(x = weight, y = playResult)) +
+  geom_point(alpha = 0.5, color = "purple") +
+  geom_smooth(method = "lm", color = "red") +
+  labs(title = "Impact of Player Weight on Yards Gained",
+       x = "Player Weight (lbs)", y = "Play Result (Yards)") +
+  theme_minimal()
+```
+
+This shows that on average, there is not a lot of correlation between weight, and being a better ball carrier, but it appear that players between 180 and 230 lbs account for the most big gains, with it being somewhat more frequent as you get closer to the middle at about 210.
+
+### College Representation and Game Impact
+
+This graph looks to analyze which colleges produce the players with the most positive game impact
+
+```{r}
+scoring_plays <- combined_data %>%
+  filter(playResult > 0) %>%
+  group_by(collegeName) %>%
+  summarize(total_yards = sum(playResult, na.rm = TRUE)) %>%
+  arrange(desc(total_yards)) %>%
+  top_n(10, total_yards)
+
+# Bar chart for colleges
+ggplot(scoring_plays, aes(x = reorder(collegeName, total_yards), y = total_yards)) +
+  geom_bar(stat = "identity", fill = "orange") +
+  coord_flip() +
+  labs(title = "Top Colleges Contributing to Scoring Plays",
+       x = "College", y = "Total Yards Gained") +
+  theme_minimal()
+```
+
+Alabama has produced the most yards by a substantial margin compared to the rest of country. The South Eastern Conference (SEC) also accounts for the rest of the top 4, and 7 of the total schools shown above. These schools have been the most successful at producing players to go to the NFL, and having players then have a positive impact on those games.
+
